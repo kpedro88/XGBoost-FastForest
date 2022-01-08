@@ -27,7 +27,6 @@ class DTree {
 		DTree() {}
 		virtual ~DTree() {}
 		inline float decision(const float* features) const {
-			if(nodes_.empty()) return vres_[0]; //single leaf tree case
 			int index = 0;
 			do {
 				auto l = nodes_[index].left_;
@@ -47,30 +46,31 @@ public:
 	//based on FastForest::evaluate() and BDTree::parseTree()
 	DForest(const FastForest& old) {
 		//loop through root nodes
-		trees_.resize(old.rootIndices_.size());
 		for (int iRootIndex = 0; iRootIndex < old.rootIndices_.size(); ++iRootIndex) {
 			int index = old.rootIndices_[iRootIndex];
 			bool isSingleLeafTree = index < 0;
-			convertTree(old, index, isSingleLeafTree, trees_[iRootIndex]);
+			if(isSingleLeafTree){
+				index++;
+				vres_.push_back(old.responses_[-index]);
+			}
+			else {
+				trees_.emplace_back();
+				convertTree(old, index, trees_.back());
+			}
 		}
 	}
-	void convertTree(const FastForest& old, int index, bool isSingleLeafTree, DTree& tree){
-		bool notLeaf = index > 0;
-		if(isSingleLeafTree) {
-			index++;
-			notLeaf = false;
-		}
-
+	void convertTree(const FastForest& old, int index, DTree& tree){
+		int thisidx = tree.nodes_.size();
+		bool notLeaf = index > 0 or thisidx==0;
 		if(notLeaf) {
-			int thisidx = tree.nodes_.size();
 			tree.nodes_.emplace_back(old.cutIndices_[index],old.cutValues_[index]);
 			//convert children recursively
 			int left = old.leftIndices_[index];
 			tree.nodes_[thisidx].left_ = left < 0 ? -tree.vres_.size() : tree.nodes_.size();
-			convertTree(old, left, false, tree);
+			convertTree(old, left, tree);
 			int right = old.rightIndices_[index];
 			tree.nodes_[thisidx].right_ = right < 0 ? -tree.vres_.size() : tree.nodes_.size();
-			convertTree(old, right, false, tree);
+			convertTree(old, right, tree);
 		}
 		else {
 			tree.vres_.push_back(old.responses_[-index]);
@@ -82,10 +82,14 @@ public:
 		for(const auto& tree : trees_){
 			sum += tree.decision(features);
 		}
+		for(auto val : vres_){
+			sum += val;
+		}
 		return sum;
 	}
 
 	std::vector<DTree> trees_;
+	std::vector<float> vres_; //handle single leaf trees separately (avoid conditional checks)
 };
 
 int main() {
