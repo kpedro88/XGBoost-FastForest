@@ -46,31 +46,30 @@ public:
 	//based on FastForest::evaluate() and BDTree::parseTree()
 	DForest(const FastForest& old) {
 		//loop through root nodes
+		trees_.resize(old.rootIndices_.size());
 		for (int iRootIndex = 0; iRootIndex < old.rootIndices_.size(); ++iRootIndex) {
 			int index = old.rootIndices_[iRootIndex];
 			bool isSingleLeafTree = index < 0;
-			if(isSingleLeafTree){
-				index++;
-				vres_.push_back(old.responses_[-index]);
-			}
-			else {
-				trees_.emplace_back();
-				convertTree(old, index, trees_.back());
-			}
+			convertTree(old, index, isSingleLeafTree, trees_[iRootIndex]);
 		}
 	}
-	void convertTree(const FastForest& old, int index, DTree& tree){
-		int thisidx = tree.nodes_.size();
-		bool notLeaf = index > 0 or thisidx==0;
+	void convertTree(const FastForest& old, int index, bool isSingleLeafTree, DTree& tree){
+		bool notLeaf = index > 0;
+		if(isSingleLeafTree) {
+			index++;
+			notLeaf = false;
+		}
+
 		if(notLeaf) {
+			int thisidx = tree.nodes_.size();
 			tree.nodes_.emplace_back(old.cutIndices_[index],old.cutValues_[index]);
 			//convert children recursively
 			int left = old.leftIndices_[index];
 			tree.nodes_[thisidx].left_ = left < 0 ? -tree.vres_.size() : tree.nodes_.size();
-			convertTree(old, left, tree);
+			convertTree(old, left, false, tree);
 			int right = old.rightIndices_[index];
 			tree.nodes_[thisidx].right_ = right < 0 ? -tree.vres_.size() : tree.nodes_.size();
-			convertTree(old, right, tree);
+			convertTree(old, right, false, tree);
 		}
 		else {
 			tree.vres_.push_back(old.responses_[-index]);
@@ -80,16 +79,13 @@ public:
 	float evaluate(const float* features){
 		float sum = 0.;
 		for(const auto& tree : trees_){
-			sum += tree.decision(features);
-		}
-		for(auto val : vres_){
-			sum += val;
+			if(tree.nodes_.empty()) sum += tree.vres_[0]; //single leaf tree case
+			else sum += tree.decision(features);
 		}
 		return sum;
 	}
 
 	std::vector<DTree> trees_;
-	std::vector<float> vres_; //handle single leaf trees separately (avoid conditional checks)
 };
 
 int main() {
