@@ -61,9 +61,10 @@ public:
 		}
 		for(int index : rootIndices_){
 			do {
-				auto l = nodes_[index].left_;
-				auto r = nodes_[index].right_;
-				index = features[nodes_[index].index_] <= nodes_[index].cut_ ? l : r;
+				const auto& node = nodes_[index];
+				auto l = node.left_;
+				auto r = node.right_;
+				index = features[node.index_] <= node.cut_ ? l : r;
 			} while (index>0);
 			sum += responses_[-index];
 		}
