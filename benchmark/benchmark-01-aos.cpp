@@ -14,14 +14,6 @@
 //https://github.com/kpedro88/Analysis/blob/SVJ2018/KMVA/BDTree.h
 //https://github.com/kpedro88/cmssw/commit/909ae926b7b13ff3887250fc0fd7a02446dc121c
 
-struct DNode {
-	DNode(unsigned i, float c, int l=0, int r=0) : index_(i), cut_(c), left_(l), right_(r) {}
-	unsigned index_;
-	float cut_;
-	int left_;
-	int right_;
-};
-
 using namespace fastforest;
 
 class DForest {
@@ -40,13 +32,15 @@ public:
 		if(notLeaf) {
 			int thisidx = nodes_.size();
 			if(root) rootIndices_.push_back(thisidx);
-			nodes_.emplace_back(old.cutIndices_[index],old.cutValues_[index]);
+			nodes_.resize(nodes_.size()+4);
+			nodes_[thisidx] = old.cutIndices_[index];
+			nodes_[thisidx+1] = (int)(old.cutValues_[index]);
 			//convert children recursively
 			int left = old.leftIndices_[index];
-			nodes_[thisidx].left_ = left < 0 ? -responses_.size() : nodes_.size();
-			convertTree(old, left);
+			nodes_[thisidx+2] = left < 0 ? -responses_.size() : nodes_.size();
+			convertTree(old, nodes_.back());
 			int right = old.rightIndices_[index];
-			nodes_[thisidx].right_ = right < 0 ? -responses_.size() : nodes_.size();
+			nodes_[thisidx+3] = right < 0 ? -responses_.size() : nodes_.size();
 			convertTree(old, right);
 		}
 		else {
@@ -61,10 +55,9 @@ public:
 		}
 		for(int index : rootIndices_){
 			do {
-				const auto& node = nodes_[index];
-				auto l = node.left_;
-				auto r = node.right_;
-				index = features[node.index_] <= node.cut_ ? l : r;
+				auto l = nodes_[index+2];
+				auto r = nodes_[index+3];
+				index = features[nodes_[index]] <= (float)nodes_[index+1] ? l : r;
 			} while (index>0);
 			sum += responses_[-index];
 		}
@@ -72,7 +65,8 @@ public:
 	}
 
 	std::vector<int> rootIndices_;
-	std::vector<DNode> nodes_;
+	//"node" layout: index, cut, left, right
+	std::vector<int> nodes_;
 	std::vector<float> responses_;
 	std::vector<float> baseResponses_;
 };
