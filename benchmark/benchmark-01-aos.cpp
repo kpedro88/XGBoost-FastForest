@@ -15,28 +15,11 @@
 //https://github.com/kpedro88/cmssw/commit/909ae926b7b13ff3887250fc0fd7a02446dc121c
 
 struct DNode {
-	DNode(unsigned i, double c, int l=0, int r=0) : index_(i), cut_(c), left_(l), right_(r) {}
+	DNode(unsigned i, float c, int l=0, int r=0) : index_(i), cut_(c), left_(l), right_(r) {}
 	unsigned index_;
 	float cut_;
 	int left_;
 	int right_;
-};
-
-class DTree {
-	public:
-		DTree() {}
-		virtual ~DTree() {}
-		inline float decision(const float* features) const {
-			int index = 0;
-			do {
-				auto l = nodes_[index].left_;
-				auto r = nodes_[index].right_;
-				index = features[nodes_[index].index_] <= nodes_[index].cut_ ? l : r;
-			} while (index>0);
-			return vres_[-index];
-		}
-		std::vector<DNode> nodes_;
-		std::vector<float> vres_;
 };
 
 using namespace fastforest;
@@ -46,46 +29,51 @@ public:
 	//based on FastForest::evaluate() and BDTree::parseTree()
 	DForest(const FastForest& old) {
 		//loop through root nodes
-		trees_.resize(old.rootIndices_.size());
 		for (int iRootIndex = 0; iRootIndex < old.rootIndices_.size(); ++iRootIndex) {
 			int index = old.rootIndices_[iRootIndex];
-			bool isSingleLeafTree = index < 0;
-			convertTree(old, index, isSingleLeafTree, trees_[iRootIndex]);
+			convertTree(old, index, true);
 		}
 	}
-	void convertTree(const FastForest& old, int index, bool isSingleLeafTree, DTree& tree){
+	void convertTree(const FastForest& old, int index, bool root=false){
 		bool notLeaf = index > 0;
-		if(isSingleLeafTree) {
-			index++;
-			notLeaf = false;
-		}
 
 		if(notLeaf) {
-			int thisidx = tree.nodes_.size();
-			tree.nodes_.emplace_back(old.cutIndices_[index],old.cutValues_[index]);
+			int thisidx = nodes_.size();
+			if(root) rootIndices_.push_back(thisidx);
+			nodes_.emplace_back(old.cutIndices_[index],old.cutValues_[index]);
 			//convert children recursively
 			int left = old.leftIndices_[index];
-			tree.nodes_[thisidx].left_ = left < 0 ? -tree.vres_.size() : tree.nodes_.size();
-			convertTree(old, left, false, tree);
+			nodes_[thisidx].left_ = left < 0 ? -responses_.size() : nodes_.size();
+			convertTree(old, left);
 			int right = old.rightIndices_[index];
-			tree.nodes_[thisidx].right_ = right < 0 ? -tree.vres_.size() : tree.nodes_.size();
-			convertTree(old, right, false, tree);
+			nodes_[thisidx].right_ = right < 0 ? -responses_.size() : nodes_.size();
+			convertTree(old, right);
 		}
 		else {
-			tree.vres_.push_back(old.responses_[-index]);
+			responses_.push_back(old.responses_[-index]);
 		}
 	}
 
 	float evaluate(const float* features){
 		float sum = 0.;
-		for(const auto& tree : trees_){
-			if(tree.nodes_.empty()) sum += tree.vres_[0]; //single leaf tree case
-			else sum += tree.decision(features);
+		for(int i = 0; i < baseResponses_.size(); ++i){
+			sum += baseResponses_[i];
+		}
+		for(int index : rootIndices_){
+			do {
+				auto l = nodes_[index].left_;
+				auto r = nodes_[index].right_;
+				index = features[nodes_[index].index_] <= nodes_[index].cut_ ? l : r;
+			} while (index>0);
+			sum += responses_[-index];
 		}
 		return sum;
 	}
 
-	std::vector<DTree> trees_;
+	std::vector<int> rootIndices_;
+	std::vector<DNode> nodes_;
+	std::vector<float> responses_;
+	std::vector<float> baseResponses_;
 };
 
 int main() {
