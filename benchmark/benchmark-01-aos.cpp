@@ -55,9 +55,7 @@ public:
 		}
 		for(int index : rootIndices_){
 			do {
-				auto l = nodes_[index+2];
-				auto r = nodes_[index+3];
-				index = features[nodes_[index]] <= (float)nodes_[index+1] ? l : r;
+				index = features[nodes_[index]] <= (float)nodes_[index+1] ? nodes_[index+2] : nodes_[index+3];
 			} while (index>0);
 			sum += responses_[-index];
 		}
