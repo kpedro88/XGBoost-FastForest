@@ -21,10 +21,10 @@ int main() {
     std::vector<float> input(5 * n);
     std::vector<double> scores(n);
 
-    std::generate(input.begin(), input.end(), std::rand);
-    for (auto& x : input) {
-        x = float(x) / RAND_MAX * 10 - 5;
-    }
+	std::uint32_t seed = 10;
+	std::mt19937 rng(seed);
+	std::uniform_real_distribution<float> rand(-5,5);
+    std::generate(input.begin(), input.end(), [&](){ return rand(rng); });
 
     clock_t begin = clock();
     for (int i = 0; i < n; ++i) {
