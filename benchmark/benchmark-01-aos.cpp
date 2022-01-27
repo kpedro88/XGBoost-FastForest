@@ -55,7 +55,7 @@ public:
 		for(int index : rootIndices_){
 			do {
 				node = &nodes_[index];
-				index = features[*node] <= (float&)(*++node) ? *++node : *(node+2);
+				index = *(node+2+(features[*node] > (float&)(*(node+1))));
 			} while (index>0);
 			sum += responses_[-index];
 		}
